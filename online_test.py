@@ -1,13 +1,19 @@
 import argparse
 import time
 import os
-import glob 
+import glob
 import sys
 import json
 import shutil
 import itertools
+
+print(sys.version_info)
+
+# os.system("pip install numpy")
+# os.system("pip install pandas")
+
 import numpy as np
-import pandas as pd 
+import pandas as pd
 import csv
 import torch
 from torch.autograd import Variable
@@ -21,7 +27,7 @@ from spatial_transforms import *
 from temporal_transforms import *
 # from temporal_transforms_adap import *
 from target_transforms import ClassLabel
-from dataset import get_online_data 
+from dataset import get_online_data
 from utils import Logger, AverageMeter, LevenshteinDistance, Queue
 
 import pdb
@@ -33,10 +39,11 @@ import scipy.io as sio
 
 
 def weighting_func(x):
-    return (1 / (1 + np.exp(-0.2*(x-9))))
+    return (1 / (1 + np.exp(-0.2 * (x - 9))))
 
 
 opt = parse_opts_online()
+
 
 def load_models(opt):
     opt.resume_path = opt.resume_path_det
@@ -58,7 +65,6 @@ def load_models(opt):
             opt.resume_path = os.path.join(opt.root_path, opt.resume_path)
         if opt.pretrain_path:
             opt.pretrain_path = os.path.join(opt.root_path, opt.pretrain_path)
-
 
     opt.scales = [opt.initial_scale]
     for i in range(1, opt.n_scales):
@@ -87,7 +93,6 @@ def load_models(opt):
     pytorch_total_params = sum(p.numel() for p in detector.parameters() if
                                p.requires_grad)
     print("Total number of trainable parameters: ", pytorch_total_params)
-
 
     opt.resume_path = opt.resume_path_clf
     opt.pretrain_path = opt.pretrain_path_clf
@@ -128,7 +133,7 @@ def load_models(opt):
         checkpoint = torch.load(opt.resume_path)
         assert opt.arch == checkpoint['arch']
         if opt.sample_duration_clf < 32 and opt.model_clf != 'c3d':
-            classifier = _modify_first_conv_layer(classifier,3,3)
+            classifier = _modify_first_conv_layer(classifier, 3, 3)
             classifier = _construct_depth_model(classifier)
             classifier = classifier.cuda()
         classifier.load_state_dict(checkpoint['state_dict'])
@@ -140,8 +145,9 @@ def load_models(opt):
 
     return detector, classifier
 
+
 opt.store_name = '{}_{}_{}'.format(opt.store_name, opt.test_subset, opt.model_clf)
-detector,classifier = load_models(opt)
+detector, classifier = load_models(opt)
 sys.stdout.flush()
 
 if opt.no_mean_norm and not opt.std_norm:
@@ -151,15 +157,13 @@ elif not opt.std_norm:
 else:
     norm_method = Normalize(opt.mean, opt.std)
 
-
 spatial_transform = Compose([
     Scale(112),
     CenterCrop(112),
     ToTensor(opt.norm_value), norm_method
-    ])
+])
 
 target_transform = ClassLabel()
-
 
 ## Get list of videos to test
 if opt.dataset == 'egogesture':
@@ -167,10 +171,10 @@ if opt.dataset == 'egogesture':
     test_paths = []
     buf = 4
     for subject in subject_list:
-        for x in glob.glob(os.path.join(opt.video_path,subject,'*/*/rgb*')):
+        for x in glob.glob(os.path.join(opt.video_path, subject, '*/*/rgb*')):
             test_paths.append(x)
 elif opt.dataset == 'nv':
-    df = pd.read_csv(os.path.join(opt.video_path,'nvgesture_test_correct_cvpr2016_v2.lst'), delimiter = ' ', header = None)
+    df = pd.read_csv(os.path.join(opt.video_path, 'nvgesture_test_correct_cvpr2016_v2.lst'), delimiter=' ', header=None)
     test_paths = []
     buf = 4
     for x in df[0].values:
@@ -182,38 +186,40 @@ elif opt.dataset == 'ipn':
     file_set = os.path.join(opt.video_path, 'Video_TestList.txt')
     test_paths = []
     buf = 0
-    with open(file_set,'rb') as f:
+    with open(file_set, 'rb') as f:
         for line in f:
             vid_name = line.decode().split('\t')[0]
             test_paths.append(os.path.join(opt.video_path, 'frames', vid_name))
 elif opt.dataset == 'AHG':
-    data = sio.loadmat(os.path.join(opt.root_path,'bega/datasets/AHG/splitfiles/testlist01.mat'))['raw_list'][0]
+    data = sio.loadmat(os.path.join(opt.root_path, 'bega/datasets/AHG/splitfiles/testlist01.mat'))['raw_list'][0]
     test_paths = []
     true_classes_all = []
     true_frames_all = []
     buf = 0
-    for i in range(data.shape[0]):                          #All videos
-        test_paths.append(str(data[i][0][0]))               #path
-        true_classes_all.append(np.array(data[i][1][0]))    #classes
-        true_frames_all.append(np.array(data[i][-2][0]))    #ef
+    for i in range(data.shape[0]):  # All videos
+        test_paths.append(str(data[i][0][0]))  # path
+        true_classes_all.append(np.array(data[i][1][0]))  # classes
+        true_frames_all.append(np.array(data[i][-2][0]))  # ef
 elif opt.dataset == 'denso':
     if opt.test_subset == 'val':
         print('Online evaluation of validation set')
-        data = sio.loadmat(os.path.join(opt.root_path,'bega/datasets/Pointing/train_sets/valid_list3.mat'))['raw_list'][0]
+        data = \
+            sio.loadmat(os.path.join(opt.root_path, 'bega/datasets/Pointing/train_sets/valid_list3.mat'))['raw_list'][0]
     elif opt.test_subset == 'test':
         print('Online evaluation of testing set')
-        data = sio.loadmat(os.path.join(opt.root_path,'bega/datasets/Pointing/train_sets/test_list3.mat'))['raw_list'][0]
+        data = sio.loadmat(os.path.join(opt.root_path, 'bega/datasets/Pointing/train_sets/test_list3.mat'))['raw_list'][
+            0]
     else:
         print('ERROR: chose val or test set for online evaluation')
-        assert(opt.test_subset == 1)
+        assert (opt.test_subset == 1)
     test_paths = []
     true_classes_all = []
     true_frames_all = []
     buf = 0
-    for i in range(data.shape[0]):                          #All videos
-        test_paths.append(str(data[i][0][0]))               #path
-        true_classes_all.append(np.array(data[i][1][0]))    #classes
-        true_frames_all.append(np.array(data[i][-1][0]))    #gef
+    for i in range(data.shape[0]):  # All videos
+        test_paths.append(str(data[i][0][0]))  # path
+        true_classes_all.append(np.array(data[i][1][0]))  # classes
+        true_frames_all.append(np.array(data[i][-1][0]))  # gef
 
 print('Start Evaluation')
 detector.eval()
@@ -236,12 +242,12 @@ for idx, path in enumerate(test_paths[buf:]):
     elif opt.dataset == 'nv':
         opt.whole_path = path.split(os.sep, 7)[-1]
     elif opt.dataset == 'ipn':
-        opt.whole_path = os.path.join('frames', path.split(os.sep)[-1])  
+        opt.whole_path = os.path.join('frames', path.split(os.sep)[-1])
     elif opt.dataset == 'AHG':
         opt.whole_path = path
     elif opt.dataset == 'denso':
         opt.whole_path = path
-    
+
     videoidx += 1
     active_index = 0
     passive_count = 0
@@ -250,14 +256,13 @@ for idx, path in enumerate(test_paths[buf:]):
     finished_prediction = None
     pre_predict = False
 
-    cum_sum = np.zeros(opt.n_classes_clf,)
-    clf_selected_queue = np.zeros(opt.n_classes_clf,)
-    det_selected_queue = np.zeros(opt.n_classes_det,)
-    myqueue_det = Queue(opt.det_queue_size ,  n_classes = opt.n_classes_det)
-    myqueue_clf = Queue(opt.clf_queue_size, n_classes = opt.n_classes_clf )
+    cum_sum = np.zeros(opt.n_classes_clf, )
+    clf_selected_queue = np.zeros(opt.n_classes_clf, )
+    det_selected_queue = np.zeros(opt.n_classes_det, )
+    myqueue_det = Queue(opt.det_queue_size, n_classes=opt.n_classes_det)
+    myqueue_clf = Queue(opt.clf_queue_size, n_classes=opt.n_classes_clf)
 
-
-    print('[{}/{}]============'.format(videoidx,len(test_paths)))
+    print('[{}/{}]============'.format(videoidx, len(test_paths)))
     print(path)
     sys.stdout.flush()
     opt.sample_duration = max(opt.sample_duration_clf, opt.sample_duration_det)
@@ -265,12 +270,11 @@ for idx, path in enumerate(test_paths[buf:]):
         opt, spatial_transform, None, target_transform)
 
     test_loader = torch.utils.data.DataLoader(
-                test_data,
-                batch_size=opt.batch_size,
-                shuffle=False,
-                num_workers=opt.n_threads,
-                pin_memory=True)
-
+        test_data,
+        batch_size=opt.batch_size,
+        shuffle=False,
+        num_workers=opt.n_threads,
+        pin_memory=True)
 
     results = []
     pred_frames = []
@@ -284,21 +288,21 @@ for idx, path in enumerate(test_paths[buf:]):
 
     for i, (inputs, targets) in enumerate(test_loader):
         if not opt.no_cuda:
-            targets = targets.cuda(async=True)
-        ground_truth_array = np.zeros(opt.n_classes_clf +1,)
+            targets = targets.cuda(non_blocking=True)
+        ground_truth_array = np.zeros(opt.n_classes_clf + 1, )
         with torch.no_grad():
             inputs = Variable(inputs)
             targets = Variable(targets)
             if opt.modality_det in ['RGB', 'RGB-D', 'RGB-flo', 'RGB-seg']:
-                inputs_det = inputs[:,:,-opt.sample_duration_det:,:,:]
+                inputs_det = inputs[:, :, -opt.sample_duration_det:, :, :]
             elif opt.modality_det == 'Depth':
-                inputs_det = inputs[:,-1,-opt.sample_duration_det:,:,:].unsqueeze(1)
-            
+                inputs_det = inputs[:, -1, -opt.sample_duration_det:, :, :].unsqueeze(1)
+
             s_dt = time.time()
             # pdb.set_trace()
             outputs_det = detector(inputs_det)
-            outputs_det = F.softmax(outputs_det,dim=1)
-            outputs_det = outputs_det.cpu().numpy()[0].reshape(-1,)
+            outputs_det = F.softmax(outputs_det, dim=1)
+            outputs_det = outputs_det.cpu().numpy()[0].reshape(-1, )
             e_dt = time.time()
 
             # enqueue the probabilities to the detector queue
@@ -312,27 +316,26 @@ for idx, path in enumerate(test_paths[buf:]):
                 det_selected_queue = myqueue_det.ma
             elif opt.det_strategy == 'ewma':
                 det_selected_queue = myqueue_det.ewma
-            
 
             prediction_det = np.argmax(det_selected_queue)
             prob_det = det_selected_queue[prediction_det]
-            
+
             #### State of the detector is checked here as detector act as a switch for the classifier
-            if  prediction_det == 1:
+            if prediction_det == 1:
                 # det_idx[i] = test_data.data[i]['frame_indices'][-1]
                 det_idx[test_data.data[i]['frame_indices'][-1]] = 1
                 pred_start.append(test_data.data[i]['frame_indices'][-1])
                 if opt.modality_clf in ['RGB', 'RGB-D', 'RGB-flo', 'RGB-seg']:
-                    inputs_clf = inputs[:,:,:,:,:]
+                    inputs_clf = inputs[:, :, :, :, :]
                 elif opt.modality_clf == 'Depth':
-                    inputs_clf = inputs[:,-1,:,:,:].unsqueeze(1)
+                    inputs_clf = inputs[:, -1, :, :, :].unsqueeze(1)
 
                 s_ct = time.time()
                 outputs_clf = classifier(inputs_clf)
-                outputs_clf = F.softmax(outputs_clf,dim=1)
-                outputs_clf = outputs_clf.cpu().numpy()[0].reshape(-1,)
+                outputs_clf = F.softmax(outputs_clf, dim=1)
+                outputs_clf = outputs_clf.cpu().numpy()[0].reshape(-1, )
                 e_ct = time.time()
-                
+
                 # Push the probabilities to queue
                 myqueue_clf.enqueue(outputs_clf.tolist())
                 passive_count = 0
@@ -349,12 +352,10 @@ for idx, path in enumerate(test_paths[buf:]):
                 # print('Sum Time: {}s ({}ms)'.format((e_dt-s_dt)+(e_ct-s_ct), ((e_dt-s_dt)+(e_ct-s_ct))*1000))
                 # print('All Time: {}s ({}ms)'.format(e_ct-s_dt, (e_ct-s_dt)*1000))
             else:
-                outputs_clf = np.zeros(opt.n_classes_clf ,)
+                outputs_clf = np.zeros(opt.n_classes_clf, )
                 # Push the probabilities to queue
                 myqueue_clf.enqueue(outputs_clf.tolist())
                 passive_count += 1
-        
-
 
         if passive_count >= opt.det_counter:
             active = False
@@ -364,21 +365,21 @@ for idx, path in enumerate(test_paths[buf:]):
         # one of the following line need to be commented !!!!
         if active:
             active_index += 1
-            cum_sum = ((cum_sum * (active_index-1)) + (weighting_func(active_index) * clf_selected_queue))/active_index # Weighted Aproach
+            cum_sum = ((cum_sum * (active_index - 1)) + (
+                    weighting_func(active_index) * clf_selected_queue)) / active_index  # Weighted Aproach
             # cum_sum = ((cum_sum * (x-1)) + (1.0 * clf_selected_queue))/x #Not Weighting Aproach 
 
             best2, best1 = tuple(cum_sum.argsort()[-2:][::1])
-            if float(cum_sum[best1]- cum_sum[best2]) > opt.clf_threshold_pre:
+            if float(cum_sum[best1] - cum_sum[best2]) > opt.clf_threshold_pre:
                 finished_prediction = True
                 pre_predict = True
-            
+
         else:
             active_index = 0
 
-
-        if active == False and  prev_active == True:
+        if active == False and prev_active == True:
             finished_prediction = True
-        elif active == True and  prev_active == False:
+        elif active == True and prev_active == False:
             finished_prediction = False
 
         if test_data.data[i]['frame_indices'][-1] % 500 == 0:
@@ -387,27 +388,43 @@ for idx, path in enumerate(test_paths[buf:]):
 
         if finished_prediction == True:
             best2, best1 = tuple(cum_sum.argsort()[-2:][::1])
-            if cum_sum[best1]>opt.clf_threshold_final:
-                if pre_predict == True:  
+            if cum_sum[best1] > opt.clf_threshold_final:
+                if pre_predict == True:
                     if best1 != prev_best1:
-                        if cum_sum[best1]>opt.clf_threshold_final:  
-                            results.append(((i*opt.stride_len)+opt.sample_duration_clf,best1))
-                            print( 'Early Detected - class : {} with prob : {} at frames {}~{}'.format(best1, cum_sum[best1], pred_start[0], test_data.data[i]['frame_indices'][-1]))
+                        if cum_sum[best1] > opt.clf_threshold_final:
+                            results.append(((i * opt.stride_len) + opt.sample_duration_clf, best1))
+                            print('Early Detected - class : {} with prob : {} at frames {}~{}'.format(best1,
+                                                                                                      cum_sum[best1],
+                                                                                                      pred_start[0],
+                                                                                                      test_data.data[i][
+                                                                                                          'frame_indices'][
+                                                                                                          -1]))
                             pred_frames.append(test_data.data[i]['frame_indices'][-1])
                             pred_starts.append(pred_start[0])
                             pred_start = []
                 else:
-                    if cum_sum[best1]>opt.clf_threshold_final:
+                    if cum_sum[best1] > opt.clf_threshold_final:
                         if best1 == prev_best1:
-                            if cum_sum[best1]>5:
-                                results.append(((i*opt.stride_len)+opt.sample_duration_clf,best1))
-                                print( 'Late Detected - class : {} with prob : {} at frames {}~{}'.format(best1, cum_sum[best1], pred_start[0], test_data.data[i]['frame_indices'][-1]))
+                            if cum_sum[best1] > 5:
+                                results.append(((i * opt.stride_len) + opt.sample_duration_clf, best1))
+                                print('Late Detected - class : {} with prob : {} at frames {}~{}'.format(best1,
+                                                                                                         cum_sum[best1],
+                                                                                                         pred_start[0],
+                                                                                                         test_data.data[
+                                                                                                             i][
+                                                                                                             'frame_indices'][
+                                                                                                             -1]))
                                 pred_frames.append(test_data.data[i]['frame_indices'][-1])
                                 pred_starts.append(pred_start[0])
                                 pred_start = []
                         else:
-                            results.append(((i*opt.stride_len)+opt.sample_duration_clf,best1))
-                            print( 'Late Detected - class : {} with prob : {} at frames {}~{}'.format(best1, cum_sum[best1], pred_start[0], test_data.data[i]['frame_indices'][-1]))
+                            results.append(((i * opt.stride_len) + opt.sample_duration_clf, best1))
+                            print('Late Detected - class : {} with prob : {} at frames {}~{}'.format(best1,
+                                                                                                     cum_sum[best1],
+                                                                                                     pred_start[0],
+                                                                                                     test_data.data[i][
+                                                                                                         'frame_indices'][
+                                                                                                         -1]))
                             pred_frames.append(test_data.data[i]['frame_indices'][-1])
                             pred_starts.append(pred_start[0])
                             pred_start = []
@@ -416,25 +433,25 @@ for idx, path in enumerate(test_paths[buf:]):
                 prev_best1 = best1
                 pred_start = []
 
-            cum_sum = np.zeros(opt.n_classes_clf,)
+            cum_sum = np.zeros(opt.n_classes_clf, )
             pred_start = []
             sys.stdout.flush()
 
-        if active == False and  prev_active == True:
+        if active == False and prev_active == True:
             pre_predict = False
-    
+
         prev_active = active
 
     if opt.dataset == 'egogesture':
-        target_csv_path = os.path.join(opt.video_path.rsplit(os.sep, 1)[0], 
-                                'labels-final-revised1',
-                                opt.whole_path.rsplit(os.sep,2)[0],
-                                'Group'+opt.whole_path[-1] + '.csv').replace('Subject', 'subject')
+        target_csv_path = os.path.join(opt.video_path.rsplit(os.sep, 1)[0],
+                                       'labels-final-revised1',
+                                       opt.whole_path.rsplit(os.sep, 2)[0],
+                                       'Group' + opt.whole_path[-1] + '.csv').replace('Subject', 'subject')
         true_classes = []
         with open(target_csv_path) as csvfile:
             readCSV = csv.reader(csvfile, delimiter=',')
             for row in readCSV:
-                true_classes.append(int(row[0])-1)
+                true_classes.append(int(row[0]) - 1)
     elif opt.dataset == 'nv':
         true_classes = []
         true_starts = []
@@ -443,8 +460,8 @@ for idx, path in enumerate(test_paths[buf:]):
             readCSV = csv.reader(csvfile, delimiter=' ')
             for row in readCSV:
                 if row[0][2:] == opt.whole_path:
-                    if row[1] != '26' :
-                        true_classes.append(int(row[1])-1)
+                    if row[1] != '26':
+                        true_classes.append(int(row[1]) - 1)
                         true_starts.append(int(row[2]))
                         true_frames.append(int(row[3]))
     elif opt.dataset == 'ipn':
@@ -455,8 +472,8 @@ for idx, path in enumerate(test_paths[buf:]):
             readCSV = csv.reader(csvfile, delimiter=' ')
             for row in readCSV:
                 if row[0][2:] == opt.whole_path:
-                    if row[1] != '1' :
-                        true_classes.append(int(row[1])-2)
+                    if row[1] != '1':
+                        true_classes.append(int(row[1]) - 2)
                         true_starts.append(int(row[2]))
                         true_frames.append(int(row[3]))
     elif opt.dataset == 'AHG':
@@ -464,14 +481,14 @@ for idx, path in enumerate(test_paths[buf:]):
         true_frames = true_frames_all[idx]
         for idc in true_classes_all[idx]:
             if idc > 7:
-                true_classes.append(int(idc-2))
+                true_classes.append(int(idc - 2))
             else:
-                true_classes.append(int(idc-1))
+                true_classes.append(int(idc - 1))
     elif opt.dataset == 'denso':
         true_classes = []
         true_frames = true_frames_all[idx]
         for idc in true_classes_all[idx]:
-            true_classes.append(int(idc-1))
+            true_classes.append(int(idc - 1))
     # if path == '/misc/dl001/dataset/NVIDIA/nvgesture_arch/./Video_data/class_02/subject13_r1/sk_depth_all':
     #     pdb.set_trace()
 
@@ -482,14 +499,14 @@ for idx, path in enumerate(test_paths[buf:]):
         levenshtein_distance = -1
     else:
         pred_frames = np.array(pred_frames)
-        predicted = np.array(results)[:,1]
+        predicted = np.array(results)[:, 1]
         levenshtein_distance = LevenshteinDistance(true_classes, predicted)
         # pdb.set_trace()
-        levenshtein_accuracy = 1-(levenshtein_distance/len(true_classes))
-        pre_cla[0:len(predicted)] = predicted+1
+        levenshtein_accuracy = 1 - (levenshtein_distance / len(true_classes))
+        pre_cla[0:len(predicted)] = predicted + 1
         end_fra[0:len(pred_frames)] = pred_frames
 
-    if levenshtein_distance <0: # Distance cannot be less than 0
+    if levenshtein_distance < 0:  # Distance cannot be less than 0
         levenshtein_accuracies.update(0, len(true_classes))
         # pass
     else:
@@ -514,12 +531,14 @@ for idx, path in enumerate(test_paths[buf:]):
     else:
         print('predicted classes:  {}'.format(' '.join(pred)))
     print('True classes :\t {}'.format(' '.join(true_gt)))
-    print('Levenshtein Accuracy = {} ({}) frame detections: {}/{}'.format(levenshtein_accuracies.val, levenshtein_accuracies.avg, np.sum(det_idx[2:]), det_idx[0]))
+    print('Levenshtein Accuracy = {} ({}) frame detections: {}/{}'.format(levenshtein_accuracies.val,
+                                                                          levenshtein_accuracies.avg,
+                                                                          np.sum(det_idx[2:]), det_idx[0]))
     det_idxs.append(det_idx)
     end_frames.append(end_fra)
     pre_classes.append(pre_cla)
     sys.stdout.flush()
-    
+
 print('Average Levenshtein Accuracy= {}'.format(levenshtein_accuracies.avg))
 
 print('-----Evaluation is finished------')
@@ -530,7 +549,7 @@ res_data['all_pred_starts'] = all_pred_starts
 res_data['all_true'] = all_true
 res_data['all_true_frames'] = all_true_frames
 res_data['all_true_starts'] = all_true_starts
-with open(os.path.join(opt.result_path,'res_'+opt.store_name+'.json'), 'w') as dst_file:
+with open(os.path.join(opt.result_path, 'res_' + opt.store_name + '.json'), 'w') as dst_file:
     json.dump(res_data, dst_file)
 # det_idxs = np.array(det_idxs)
 # end_frames = np.array(end_frames)

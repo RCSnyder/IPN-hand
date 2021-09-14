@@ -1,8 +1,11 @@
 #!/bin/bash
-export CUDA_VISIBLE_DEVICES=0
 
-python offline_test.py \
-	--root_path /host/space0/gibran/\
+echo hello
+python3 -c 'import sys; print(".".join(map(str, sys.version_info[:3])))'
+
+
+python3 offline_test.py \
+	--root_path D:/__School/__Masters/____2021fALL/5280_aiwearables/IPN_Hand \
 	--video_path dataset/HandGestures/IPN_dataset \
 	--annotation_path scripts/Real-time-GesRec/annotation_ipnGesture/ipnall_but_None.json \
 	--result_path scripts/Real-time-GesRec/results_ipn \

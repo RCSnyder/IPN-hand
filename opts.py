@@ -252,7 +252,7 @@ def parse_opts_offline():
     parser.set_defaults(no_scrop=False)
     parser.add_argument(
         '--no_cuda', action='store_true', help='If true, cuda is not used.')
-    parser.set_defaults(no_cuda=False)
+    parser.set_defaults(no_cuda=True)
     parser.add_argument(
         '--n_threads',
         default=4,

@@ -1,8 +1,7 @@
 #!/bin/bash
-export CUDA_VISIBLE_DEVICES=0
 
 python online_test.py \
-	--root_path /host/space0/gibran/ \
+	--root_path D:/__School/__Masters/____2021fALL/5280_aiwearables/IPN_Hand \
 	--video_path dataset/HandGestures/IPN_dataset \
 	--annotation_path scripts/Real-time-GesRec/annotation_ipnGesture/ipnall.json \
 	--resume_path_det scripts/Real-time-GesRec/report_ipn/ipnDetRf_sc8b64_resnetl-10.pth \
@@ -37,4 +36,4 @@ python online_test.py \
 	--clf_queue_size 16 \
 	--clf_threshold_pre 0.15 \
 	--clf_threshold_final 0.15 \
-	--stride_len 1 \
+	--stride_len 1
